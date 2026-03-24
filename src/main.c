@@ -1,18 +1,15 @@
-// #include "SDL.h"
 #include "GL/gl.h"
 #include "GL/glext.h"
 #include "GL/glut.h"
-#include "player.hpp"
-#include <chrono>
-#include <cstring>
-// #include "console/Console.hpp"
 #include "macros.h"
+#include "player.h"
+#include <libavutil/frame.h>
 
 #ifdef __RETRO68__
 #include <Timer.h>
 #endif
 
-static player::Player *pl = NULL;
+static pp_player *pl = NULL;
 
 void display(void);
 void idle(void);
@@ -22,8 +19,6 @@ int window;
 GLint format = GL_RGB;
 void InitTexture(GLsizei width, GLsizei height, uint8_t *data);
 
-auto getTime() { return std::chrono::system_clock::now(); }
-
 #ifdef __RETRO68__
 static QElem what;
 #endif
@@ -32,14 +27,13 @@ int main(int argc, char **argv) {
   InsTime(&what);
 #endif
   char buf[255];
-  printf("%d\n", argc);
   if (argc < 2) {
     printf("Type a file to open: \n");
     scanf("%s", &buf);
   } else {
     strncpy(buf, argv[1], 255);
   }
-  pl = new player::Player(buf);
+  pl = pp_player_create(buf);
 
   /* start of glut windowing and control functions */
   GL_COMMAND(glutInit(&argc, argv));
@@ -48,7 +42,7 @@ int main(int argc, char **argv) {
   if (pl->hasVideo) {
     GL_COMMAND(glutInitWindowSize(pl->realWidth, pl->realHeight));
 
-    auto frame = pl->pRGBFrame;
+    AVFrame *frame = pl->pRGBFrame;
     InitTexture(frame->width, frame->height, frame->data[0]);
 
     format = ffmpeg_pix_format_to_gl(pl->pRGBFrame->format);
@@ -91,8 +85,8 @@ void UpdateTexture(GLsizei width, GLsizei height, uint8_t *data) {
 }
 
 void idle(void) {
-  auto framerate = pl->framerate();
-  pl->step();
+  int framerate = pp_player_framerate(pl);
+  pp_player_step(pl);
   GL_COMMAND(glutPostRedisplay());
 
 #ifdef __RETRO68__
@@ -107,7 +101,7 @@ void display_hasVideo(void) {
   GL_COMMAND(glPushMatrix());
   GL_COMMAND(glTranslatef(0, 0, 0));
 
-  auto frame = pl->pRGBFrame;
+  AVFrame *frame = pl->pRGBFrame;
   UpdateTexture(frame->width, frame->height, frame->data[0]);
 
   GL_COMMAND(glBindTexture(GL_TEXTURE_2D, textureID));
@@ -145,7 +139,7 @@ void display(void) {
 }
 
 void PauseIfGLError(const char *file, int line_num, const char *code) {
-  auto err = glGetError();
+  GLenum err = glGetError();
   switch (err) {
   case GL_NO_ERROR:
     return;
