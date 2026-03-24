@@ -1,3 +1,4 @@
 /vendored linguist-vendored=false
 /build*/
-/lib*/
+/.cache/
+/.vscode/

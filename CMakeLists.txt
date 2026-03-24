@@ -7,6 +7,8 @@ file(GLOB_RECURSE sources
 )
 file(GLOB_RECURSE data resources/*)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 if(CMAKE_SYSTEM_NAME MATCHES Retro)
     add_application(${PROJECT_NAME} ${sources} ${data})
     add_compile_definitions(__RETRO68__)
@@ -14,7 +16,10 @@ else()
     add_executable(${PROJECT_NAME} ${sources} ${data})
 endif()
 
-set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 20)
+target_link_libraries(${PROJECT_NAME} Mw)
+
+message(CMAKE_C_COMPILER ": " ${CMAKE_C_COMPILER})
+message(CMAKE_CXX_COMPILER ": " ${CMAKE_CXX_COMPILER})
 
 if(PLATFORM MATCHES retro68)
     add_compile_definitions(FOR_68K)
@@ -24,17 +29,13 @@ if(PLATFORM MATCHES retroppc)
     add_compile_definitions(FOR_PPC)
     set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "-ffunction-sections -mcpu=601 -Os -Wall -Wextra -Wno-unused-parameter")
     set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "-Wl,-gc-sections")
-    target_link_libraries( ${PROJECT_NAME} PowerMgrLib)
-    target_link_libraries( ${PROJECT_NAME} NameRegistryLib)
     target_link_libraries( ${PROJECT_NAME} OpenGL)
 endif()
 
-target_link_libraries(${PROJECT_NAME} Mw)
+# TODO: vendor
+target_link_libraries( ${PROJECT_NAME} png)
 
-message(CMAKE_C_COMPILER ": " ${CMAKE_C_COMPILER})
-message(CMAKE_CXX_COMPILER ": " ${CMAKE_CXX_COMPILER})
-
-# Retro68: compile ffmpeg and link against the OpenGL stub.
+# ffmpeg/opengl
 if(CMAKE_SYSTEM_NAME MATCHES Retro)
     include_directories(${CMAKE_SOURCE_DIR}/vendored/FFmpeg)
     target_link_directories(${PROJECT_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/lib/lib/)

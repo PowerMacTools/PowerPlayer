@@ -204,7 +204,6 @@ static void display_hasVideo(void) {
   GL_COMMAND(glClearColor(1.0f, 0.0f, 1.0f, 1.0f));
   GL_COMMAND(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
   GL_COMMAND(glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL));
-  GL_COMMAND(glPushMatrix());
   GL_COMMAND(glTranslatef(0, 0, 0));
 
   AVFrame *frame = pl->pRGBFrame;
@@ -216,6 +215,7 @@ static void display_hasVideo(void) {
 
   glBegin(GL_QUADS);
 
+  printf("%0.2f\n", pl->widthDiff);
   glTexCoord2f(0.0, pl->heightDiff);
   glVertex2f(-1.0, -1.0);
   glTexCoord2f(pl->widthDiff, pl->heightDiff);
@@ -225,8 +225,6 @@ static void display_hasVideo(void) {
   glTexCoord2f(0.0, 0.0);
   glVertex2f(-1.0, 1.0);
   glEnd();
-
-  GL_COMMAND(glPopMatrix());
 }
 
 static void display_onlyAudio(void) {
@@ -257,7 +255,7 @@ static void module_step() {
 #endif
 }
 
-pp_module pp_get_module(char *buf) {
+pp_module pp_multimedia_module(char *buf) {
   return (pp_module){
       .setup = module_setup,
       .step = module_step,
