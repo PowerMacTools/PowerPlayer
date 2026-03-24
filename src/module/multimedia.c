@@ -1,5 +1,43 @@
-#include "player.h"
-#include <assert.h>
+#include "../ff/ff.h"
+#include "../macros.h"
+#include "GL/gl.h"
+#include "module.h"
+#include <Mw/BaseTypes.h>
+#include <Mw/TypeDefs.h>
+
+typedef struct pp_player_t {
+  AVFormatContext *pFormatCtx;
+  struct SwsContext *img_convert_ctx;
+  struct SwsContext *sws_ctx;
+  AVStream *videoStream;
+  AVStream *audioStream;
+  AVCodecParameters *videoPar;
+  AVCodecParameters *audioPar;
+
+  const AVCodec *videoCodec;
+  const AVCodec *audioCodec;
+  AVCodecContext *audioCodecCtx;
+  AVCodecContext *videoCodecCtx;
+  AVFrame *frame;
+  AVPacket *packet;
+
+  int vframe;
+  GLint format;
+
+  MwBool hasVideo;
+  MwBool hasAudio;
+
+  int realWidth;
+  int realHeight;
+
+  float widthDiff;
+  float heightDiff;
+
+  AVFrame *pRGBFrame;
+  GLuint textureID;
+} pp_player;
+
+static pp_player *pl = NULL;
 
 int pp_player_framerate(pp_player *self) {
   return self->videoCodecCtx->framerate.num;
@@ -27,7 +65,7 @@ pp_player *pp_player_create(char *buf) {
       printf("CODEC: Audio sample rate %d, channels: %d\n",
              player->audioPar->sample_rate,
              player->audioPar->ch_layout.nb_channels);
-      player->hasAudio = true;
+      player->hasAudio = MwTRUE;
       continue;
     }
     if (tmpPar->codec_type == AVMEDIA_TYPE_VIDEO) {
@@ -35,7 +73,7 @@ pp_player *pp_player_create(char *buf) {
       player->videoPar = tmpPar;
       printf("CODEC: Resolution %d x %d, type: %d\n", player->videoPar->width,
              player->videoPar->height, player->videoPar->codec_id);
-      player->hasVideo = true;
+      player->hasVideo = MwTRUE;
       continue;
     }
   }
@@ -143,4 +181,117 @@ void pp_player_drop(pp_player *p) {
 
   avformat_close_input(&p->pFormatCtx);
   pq_free();
+}
+
+static void InitTexture(GLsizei width, GLsizei height, uint8_t *data) {
+  GL_COMMAND(glGenTextures(1, &pl->textureID));
+  GL_COMMAND(glBindTexture(GL_TEXTURE_2D, pl->textureID));
+  GL_COMMAND(glTexImage2D(GL_TEXTURE_2D, 0, pl->format, width, height, 0,
+                          GL_RGB, GL_UNSIGNED_BYTE, data));
+  GL_COMMAND(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+  GL_COMMAND(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+}
+
+static void UpdateTexture(GLsizei width, GLsizei height, uint8_t *data) {
+  GL_COMMAND(glBindTexture(GL_TEXTURE_2D, pl->textureID));
+  GL_COMMAND(glTexImage2D(GL_TEXTURE_2D, 0, pl->format, width, height, 0,
+                          GL_RGB, GL_UNSIGNED_BYTE, data));
+  GL_COMMAND(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+  GL_COMMAND(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+}
+
+static void display_hasVideo(void) {
+  GL_COMMAND(glClearColor(1.0f, 0.0f, 1.0f, 1.0f));
+  GL_COMMAND(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+  GL_COMMAND(glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL));
+  GL_COMMAND(glPushMatrix());
+  GL_COMMAND(glTranslatef(0, 0, 0));
+
+  AVFrame *frame = pl->pRGBFrame;
+  UpdateTexture(frame->width, frame->height, frame->data[0]);
+
+  GL_COMMAND(glBindTexture(GL_TEXTURE_2D, pl->textureID));
+
+  GL_COMMAND(glEnable(GL_TEXTURE_2D));
+
+  glBegin(GL_QUADS);
+
+  glTexCoord2f(0.0, pl->heightDiff);
+  glVertex2f(-1.0, -1.0);
+  glTexCoord2f(pl->widthDiff, pl->heightDiff);
+  glVertex2f(1.0, -1.0);
+  glTexCoord2f(pl->widthDiff, 0.0);
+  glVertex2f(1.0, 1.0);
+  glTexCoord2f(0.0, 0.0);
+  glVertex2f(-1.0, 1.0);
+  glEnd();
+
+  GL_COMMAND(glPopMatrix());
+}
+
+static void display_onlyAudio(void) {
+  GL_COMMAND(glClearColor(1.0f, 1.0f, 1.0f, 1.0f));
+}
+
+static void module_setup(char *buf) {
+  pl = pp_player_create(buf);
+
+  AVFrame *frame = pl->pRGBFrame;
+  InitTexture(frame->width, frame->height, frame->data[0]);
+
+  pl->format = ffmpeg_pix_format_to_gl(pl->pRGBFrame->format);
+}
+
+static void module_step() {
+  int framerate = pp_player_framerate(pl);
+  pp_player_step(pl);
+
+  if (pl->hasVideo) {
+    display_hasVideo();
+  } else {
+    display_onlyAudio();
+  }
+
+#ifdef __RETRO68__
+  PrimeTime(&what, framerate);
+#endif
+}
+
+pp_module pp_get_module(char *buf) {
+  return (pp_module){
+      .setup = module_setup,
+      .step = module_step,
+  };
+};
+
+void PauseIfGLError(const char *file, int line_num, const char *code) {
+  GLenum err = glGetError();
+  switch (err) {
+  case GL_NO_ERROR:
+    return;
+  case GL_INVALID_ENUM:
+    __THROW_ERROR(err, "OpenGL Error at %s:%d \"%s\": Invalid Enum\n", file,
+                  line_num, code);
+    break;
+  case GL_INVALID_VALUE:
+    __THROW_ERROR(err, "OpenGL Error at %s:%d \"%s\": Invalid Value\n", file,
+                  line_num, code);
+    break;
+  case GL_INVALID_OPERATION:
+    __THROW_ERROR(err, "OpenGL Error at %s:%d \"%s\": Invalid Operation\n",
+                  file, line_num, code);
+    break;
+  case GL_OUT_OF_MEMORY:
+    __THROW_ERROR(err, "OpenGL Error at %s:%d \"%s\": Out of Memory\n", file,
+                  line_num, code);
+    break;
+  case GL_STACK_UNDERFLOW:
+    __THROW_ERROR(err, "OpenGL Error at %s:%d \"%s\": Stack Underflow\n", file,
+                  line_num, code);
+    break;
+  case GL_STACK_OVERFLOW:
+    __THROW_ERROR(err, "OpenGL Error at %s:%d \"%s\": Stack Overflow\n", file,
+                  line_num, code);
+    break;
+  }
 }
