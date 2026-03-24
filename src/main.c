@@ -1,9 +1,15 @@
 #include "GL/gl.h"
-#include "GL/glext.h"
-#include "GL/glut.h"
 #include "macros.h"
 #include "player.h"
+#include <Mw/Constants.h>
+#include <Mw/Core.h>
+#include <Mw/Milsko.h>
+#include <Mw/StringDefs.h>
+#include <Mw/TypeDefs.h>
+#include <Mw/Widget/Window.h>
 #include <libavutil/frame.h>
+
+#include <Mw/Widget/OpenGL.h>
 
 #ifdef __RETRO68__
 #include <Timer.h>
@@ -11,10 +17,11 @@
 
 static pp_player *pl = NULL;
 
-void display(void);
-void idle(void);
+static MwWidget *window = NULL;
+static MwWidget *gl = NULL;
+
+void idle(MwWidget handle, void *user_data, void *call_data);
 GLuint textureID;
-int window;
 
 GLint format = GL_RGB;
 void InitTexture(GLsizei width, GLsizei height, uint8_t *data);
@@ -22,11 +29,15 @@ void InitTexture(GLsizei width, GLsizei height, uint8_t *data);
 #ifdef __RETRO68__
 static QElem what;
 #endif
+
 int main(int argc, char **argv) {
+  MwLibraryInit();
+
 #ifdef __RETRO68__
   InsTime(&what);
 #endif
   char buf[255];
+  memset(buf, 0, 255);
   if (argc < 2) {
     printf("Type a file to open: \n");
     scanf("%s", &buf);
@@ -35,29 +46,26 @@ int main(int argc, char **argv) {
   }
   pl = pp_player_create(buf);
 
-  /* start of glut windowing and control functions */
-  GL_COMMAND(glutInit(&argc, argv));
-  GL_COMMAND(glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH));
-
   if (pl->hasVideo) {
-    GL_COMMAND(glutInitWindowSize(pl->realWidth, pl->realHeight));
+    window = MwCreateWidget(MwWindowClass, buf, NULL, MwDEFAULT, MwDEFAULT,
+                            pl->realWidth, pl->realHeight);
+    gl = MwCreateWidget(MwOpenGLClass, "gl", window, MwDEFAULT, MwDEFAULT,
+                        pl->realWidth, pl->realHeight);
 
     AVFrame *frame = pl->pRGBFrame;
     InitTexture(frame->width, frame->height, frame->data[0]);
 
     format = ffmpeg_pix_format_to_gl(pl->pRGBFrame->format);
   } else {
-    GL_COMMAND(glutInitWindowSize(512, 384));
+    window = MwCreateWidget(MwWindowClass, buf, NULL, MwDEFAULT, MwDEFAULT, 512,
+                            384);
+    gl = MwCreateWidget(MwOpenGLClass, "gl", window, MwDEFAULT, MwDEFAULT, 512,
+                        384);
   }
 
-  window = GL_COMMAND(glutCreateWindow(buf));
+  MwAddUserHandler(window, MwNtickHandler, idle, NULL);
 
-  GL_COMMAND(glutSetWindowTitle(buf));
-
-  GL_COMMAND(glutIdleFunc(idle));
-  GL_COMMAND(glutDisplayFunc(display));
-
-  GL_COMMAND(glutMainLoop());
+  MwLoop(window);
 
   printf("Program exit.\n");
   getchar();
@@ -76,7 +84,6 @@ void InitTexture(GLsizei width, GLsizei height, uint8_t *data) {
 }
 
 void UpdateTexture(GLsizei width, GLsizei height, uint8_t *data) {
-  // GL_COMMAND(glGenTextures(1, &textureID));
   GL_COMMAND(glBindTexture(GL_TEXTURE_2D, textureID));
   GL_COMMAND(glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, GL_RGB,
                           GL_UNSIGNED_BYTE, data));
@@ -84,15 +91,6 @@ void UpdateTexture(GLsizei width, GLsizei height, uint8_t *data) {
   GL_COMMAND(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
 }
 
-void idle(void) {
-  int framerate = pp_player_framerate(pl);
-  pp_player_step(pl);
-  GL_COMMAND(glutPostRedisplay());
-
-#ifdef __RETRO68__
-  PrimeTime(&what, framerate);
-#endif
-}
 void display_hasVideo(void) {
 
   GL_COMMAND(glClearColor(1.0f, 0.0f, 1.0f, 1.0f));
@@ -120,22 +118,28 @@ void display_hasVideo(void) {
   glVertex2f(-1.0, 1.0);
   glEnd();
 
-  GL_COMMAND(glutSwapBuffers());
   GL_COMMAND(glPopMatrix());
 }
 
 void display_onlyAudio(void) {
   GL_COMMAND(glClearColor(1.0f, 1.0f, 1.0f, 1.0f));
-
-  GL_COMMAND(glutSwapBuffers());
 }
 
-void display(void) {
+void idle(MwWidget handle, void *user_data, void *call_data) {
+  int framerate = pp_player_framerate(pl);
+  pp_player_step(pl);
+
   if (pl->hasVideo) {
     display_hasVideo();
   } else {
     display_onlyAudio();
   }
+
+#ifdef __RETRO68__
+  PrimeTime(&what, framerate);
+#endif
+
+  MwOpenGLSwapBuffer(gl);
 }
 
 void PauseIfGLError(const char *file, int line_num, const char *code) {
