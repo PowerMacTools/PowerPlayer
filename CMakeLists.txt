@@ -1,23 +1,10 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.6)
 
 project(ppcplayer LANGUAGES C CXX)
 
 
-
-
-###############################################################################
-## file globbing ##############################################################
-###############################################################################
-
-# these instructions search the directory tree when CMake is
-# invoked and put all files that match the pattern in the variables
-# `sources` and `data`
-file(GLOB_RECURSE sources   
-    src/**/**/**/*.c src/**/**/**/*.h src/**/**/**/*.cpp src/**/**/**/*.hpp 
-    src/**/**/*.c src/**/**/*.h src/**/**/*.cpp src/**/**/*.hpp 
-    src/**/*.c src/**/*.h src/**/*.cpp src/**/*.hpp 
-    src/*.c src/*.h src/*.cpp src/*.hpp
-    src/*.r src/**/*.r src/**/**/*.r src/**/**/**/*.r src/**/**/**/**/*.r
+file(GLOB_RECURSE sources
+    src/*.c src/*.h src/*.cpp src/*.hpp src/*.r
 )
 file(GLOB_RECURSE data resources/*)
 # you can use set(sources src/main.cpp) etc if you don't want to
@@ -31,6 +18,7 @@ file(GLOB_RECURSE data resources/*)
 
 if(CMAKE_SYSTEM_NAME MATCHES Retro)
 add_application(ppcplayer ${sources} ${data})
+add_compile_definitions(__RETRO68__)
 else()
 add_executable(ppcplayer ${sources} ${data})
 endif()
@@ -49,7 +37,7 @@ target_link_libraries( ppcplayer PowerMgrLib)
 target_link_libraries( ppcplayer NameRegistryLib)
 target_link_libraries( ppcplayer OpenGL)
 endif()
- 
+
 message(CMAKE_C_COMPILER ": " ${CMAKE_C_COMPILER})
 message(CMAKE_CXX_COMPILER ": " ${CMAKE_CXX_COMPILER})
 
@@ -85,7 +73,7 @@ if(CMAKE_SYSTEM_NAME MATCHES Retro)
 
     include_directories(${CMAKE_SOURCE_DIR}/vendored/include)
     link_directories(${CMAKE_SOURCE_DIR}/vendored/lib)
-    
+
     target_link_libraries(ppcplayer ${CMAKE_SOURCE_DIR}/vendored/lib/libgl.a)
     target_link_libraries(ppcplayer ${CMAKE_SOURCE_DIR}/vendored/lib/libglmem.a)
     target_link_libraries(ppcplayer ${CMAKE_SOURCE_DIR}/vendored/lib/libglutil.a)

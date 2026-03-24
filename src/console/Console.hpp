@@ -1,3 +1,4 @@
+#ifdef __RETRO68__
 /*
     Copyright 2012-2020 Wolfgang Thaller, Davide Bucci
 
@@ -24,125 +25,118 @@
 #define RETRO68_CONSOLE_H_
 
 #include <Quickdraw.h>
-#include <vector>
 #include <string>
+#include <vector>
 
-namespace retro
-{
-    class Attributes
-    {
-    public:
+namespace retro {
+class Attributes {
+public:
+  bool isBold(void) const;
+  bool isUnderline(void) const;
+  bool isItalic(void) const;
 
-        bool isBold(void) const;
-        bool isUnderline(void) const;
-        bool isItalic(void) const;
+  void setBold(const bool v);
+  void setUnderline(const bool v);
+  void setItalic(const bool v);
 
-        void setBold(const bool v);
-        void setUnderline(const bool v);
-        void setItalic(const bool v);
+  Attributes(void);
+  void reset(void);
 
-        Attributes(void);
-        void reset(void);
+private:
+  bool cBold;
+  bool cUnderline;
+  bool cItalic;
+};
 
-    private:
+class AttributedChar {
+public:
+  char c;
+  Attributes attrs;
+  AttributedChar(char cc, Attributes aa) {
+    c = cc;
+    attrs = aa;
+  }
+};
 
-        bool cBold;
-        bool cUnderline;
-        bool cItalic;
-    };
+enum class State {
+  noSequence,
+  waitingForSequenceStart,
+  waitingForControlSequence,
+  waitingForM,
+  waitingForOSCStart,
+  waitingForSemicolon,
+  inWindowName
+};
 
-    class AttributedChar
-    {
-    public:
-        char c;
-        Attributes attrs;
-        AttributedChar(char cc, Attributes aa) {c=cc; attrs=aa;}
-    };
+class Console {
+public:
+  Console();
+  Console(GrafPtr port, Rect r);
+  ~Console();
 
-    enum class State
-    {
-        noSequence,
-        waitingForSequenceStart,
-        waitingForControlSequence,
-        waitingForM,
-        waitingForOSCStart,
-        waitingForSemicolon,
-        inWindowName
-    };
+  void Reshape(Rect newBounds);
 
-    class Console
-    {
-    public:
-        Console();
-        Console(GrafPtr port, Rect r);
-        ~Console();
+  void Draw(Rect r);
+  void Draw() { Draw(bounds); }
+  void putch(char c);
 
-        void Reshape(Rect newBounds);
+  void write(const char *s, int n);
+  std::string ReadLine();
 
-        void Draw(Rect r);
-        void Draw() { Draw(bounds); }
-        void putch(char c);
+  static Console *currentInstance;
 
-        void write(const char *s, int n);
-        std::string ReadLine();
+  short GetRows() const { return rows; }
+  short GetCols() const { return cols; }
 
-        static Console *currentInstance;
+  virtual void setWindowName(std::string newName) {};
 
-        short GetRows() const { return rows; }
-        short GetCols() const { return cols; }
+  void Idle();
 
-        virtual void setWindowName(std::string newName) {};
+  bool IsEOF() const { return eof; }
 
+private:
+  State sequenceState;
+  std::string windowName;
+  GrafPtr consolePort = nullptr;
+  Rect bounds;
+  Attributes currentAttr;
 
-        void Idle();
+  std::vector<AttributedChar> chars, onscreen;
 
-        bool IsEOF() const { return eof; }
+  short cellSizeX;
+  short cellSizeY;
 
-    private:
+  short rows = 0, cols = 0;
 
-        State sequenceState;
-        std::string windowName;
-        GrafPtr consolePort = nullptr;
-        Rect bounds;
-        Attributes currentAttr;
+  short cursorX, cursorY;
 
-        std::vector<AttributedChar> chars, onscreen;
+  Rect dirtyRect = {};
 
-        short cellSizeX;
-        short cellSizeY;
+  long blinkTicks = 0;
+  bool cursorDrawn = false;
+  bool cursorVisible = true;
+  bool eof = false;
 
-        short rows = 0, cols = 0;
+  void PutCharNoUpdate(char c);
+  void Update();
 
-        short cursorX, cursorY;
+  short CalcStartX(short x, short y);
+  Rect CellRect(short x, short y);
+  void DrawCell(short x, short y, bool erase = true);
+  void DrawCells(short x1, short x2, short y, bool erase = true);
+  void ScrollUp(short n = 1);
+  bool ProcessEscSequence(char c);
+  void SetAttributes(Attributes aa);
 
-        Rect dirtyRect = {};
+  void InvalidateCursor();
 
-        long blinkTicks = 0;
-        bool cursorDrawn = false;
-        bool cursorVisible = true;
-        bool eof = false;
+  virtual char WaitNextChar();
 
-        void PutCharNoUpdate(char c);
-        void Update();
+protected:
+  void Init(GrafPtr port, Rect r);
+};
 
-        short CalcStartX(short x, short y);
-        Rect CellRect(short x, short y);
-        void DrawCell(short x, short y, bool erase = true);
-        void DrawCells(short x1, short x2, short y, bool erase = true);
-        void ScrollUp(short n = 1);
-        bool ProcessEscSequence(char c);
-        void SetAttributes(Attributes aa);
-
-        void InvalidateCursor();
-
-        virtual char WaitNextChar();
-
-    protected:
-        void Init(GrafPtr port, Rect r);
-
-    };
-
-
-}
+} // namespace retro
 
 #endif /* RETRO68_CONSOLE_H_ */
+#endif

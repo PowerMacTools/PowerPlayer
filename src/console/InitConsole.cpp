@@ -1,3 +1,5 @@
+#ifdef __RETRO68__
+
 /*
     Copyright 2014 Wolfgang Thaller.
 
@@ -23,97 +25,95 @@
 
 #include <string>
 
-#include <Quickdraw.h>
-#include <MacMemory.h>
-#include <Sound.h>
 #include <Events.h>
 #include <Fonts.h>
+#include <MacMemory.h>
+#include <Quickdraw.h>
+#include <Sound.h>
 
-#include <sys/types.h>
 #include <string.h>
+#include <sys/types.h>
 
-#include "MacUtils.h"
 #include "Console.hpp"
 #include "ConsoleWindow.hpp"
+#include "MacUtils.h"
 
-namespace retro
-{
-    void InitConsole();
+namespace retro {
+void InitConsole();
 }
 
 using namespace retro;
 
-void retro::InitConsole()
-{
-    if (Console::currentInstance)
-        return;
-    Console::currentInstance = (Console *)-1;
+void retro::InitConsole() {
+  if (Console::currentInstance)
+    return;
+  Console::currentInstance = (Console *)-1;
 
 #if !TARGET_API_MAC_CARBON
-    InitGraf(&qd.thePort);
-    InitFonts();
-    InitWindows();
-    InitMenus();
+  InitGraf(&qd.thePort);
+  InitFonts();
+  InitWindows();
+  InitMenus();
 
-    int width = qd.screenBits.bounds.right / 2;
-    int height = qd.screenBits.bounds.bottom / 2;
-    Rect r = (Rect){
-        .top = height / 2,
-        .left = width / 2,
-        .bottom = height + (height / 2),
-        .right = width + (width / 2),
-    };
+  int width = qd.screenBits.bounds.right / 2;
+  int height = qd.screenBits.bounds.bottom / 2;
+  Rect r = (Rect){
+      .top = height / 2,
+      .left = width / 2,
+      .bottom = height + (height / 2),
+      .right = width + (width / 2),
+  };
 #else
-    Rect r = (*GetMainDevice())->gdRect;
+  Rect r = (*GetMainDevice())->gdRect;
 #endif
-    {
-        // give MultiFinder a chance to bring the App to front
-        // see Technote TB 35 - MultiFinder Miscellanea
-        // "If your application [...] has the canBackground bit set in the
-        //  size resource, then it should call _EventAvail several times
-        //  (or _WaitNextEvent or _GetNextEvent) before putting up the splash
-        //  screen, or the splash screen will come up behind the frontmost
-        //  layer. If the canBackground bit is set, MultiFinder will not move
-        //  your layer to the front until you call _GetNextEvent,
-        //  _WaitNextEvent, or _EventAvail."
+  {
+    // give MultiFinder a chance to bring the App to front
+    // see Technote TB 35 - MultiFinder Miscellanea
+    // "If your application [...] has the canBackground bit set in the
+    //  size resource, then it should call _EventAvail several times
+    //  (or _WaitNextEvent or _GetNextEvent) before putting up the splash
+    //  screen, or the splash screen will come up behind the frontmost
+    //  layer. If the canBackground bit is set, MultiFinder will not move
+    //  your layer to the front until you call _GetNextEvent,
+    //  _WaitNextEvent, or _EventAvail."
 
-        EventRecord event;
-        for (int i = 0; i < 5; i++)
-            EventAvail(everyEvent, &event);
-    }
+    EventRecord event;
+    for (int i = 0; i < 5; i++)
+      EventAvail(everyEvent, &event);
+  }
 
-    r.top += 40;
-    InsetRect(&r, 5, 5);
+  r.top += 40;
+  InsetRect(&r, 5, 5);
 
-    Console::currentInstance = new ConsoleWindow(r, "\pRetro68 Console");
-    InitCursor();
+  Console::currentInstance = new ConsoleWindow(r, "\pRetro68 Console");
+  InitCursor();
 }
 
-extern "C" ssize_t _consolewrite(int fd, const void *buf, size_t count)
-{
-    if (!Console::currentInstance)
-        InitConsole();
-    if (Console::currentInstance == (Console *)-1)
-        return 0;
+extern "C" ssize_t _consolewrite(int fd, const void *buf, size_t count) {
+  if (!Console::currentInstance)
+    InitConsole();
+  if (Console::currentInstance == (Console *)-1)
+    return 0;
 
-    Console::currentInstance->write((const char *)buf, count);
-    return count;
+  Console::currentInstance->write((const char *)buf, count);
+  return count;
 }
 
-extern "C" ssize_t _consoleread(int fd, void *buf, size_t count)
-{
-    if (!Console::currentInstance)
-        InitConsole();
-    if (Console::currentInstance == (Console *)-1)
-        return 0;
+extern "C" ssize_t _consoleread(int fd, void *buf, size_t count) {
+  if (!Console::currentInstance)
+    InitConsole();
+  if (Console::currentInstance == (Console *)-1)
+    return 0;
 
-    static std::string consoleBuf;
-    if (consoleBuf.size() == 0)
-        consoleBuf = Console::currentInstance->ReadLine();
+  static std::string consoleBuf;
+  if (consoleBuf.size() == 0)
+    consoleBuf = Console::currentInstance->ReadLine();
 
-    if (count > consoleBuf.size())
-        count = consoleBuf.size();
-    memcpy(buf, consoleBuf.data(), count);
-    consoleBuf = consoleBuf.substr(count);
-    return count;
+  if (count > consoleBuf.size())
+    count = consoleBuf.size();
+  memcpy(buf, consoleBuf.data(), count);
+  consoleBuf = consoleBuf.substr(count);
+  return count;
 }
+
+#endif

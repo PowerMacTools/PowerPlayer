@@ -1,3 +1,4 @@
+#ifdef __RETRO68__
 /*
     Copyright 2012-2020 Wolfgang Thaller, Davide Bucci
 
@@ -22,23 +23,22 @@
 */
 
 #include <Windows.h>
-#include <vector>
 #include <string>
+#include <vector>
 
 #include "Console.hpp"
 
-namespace retro
-{
-    class ConsoleWindow : public Console
-    {
-    public:
-        ConsoleWindow(Rect r, ConstStr255Param title);
-        ~ConsoleWindow();
-        void setWindowName(std::string newName);
+namespace retro {
+class ConsoleWindow : public Console {
+public:
+  ConsoleWindow(Rect r, ConstStr255Param title);
+  ~ConsoleWindow();
+  void setWindowName(std::string newName);
 
-    private:
-        WindowPtr win;
+private:
+  WindowPtr win;
 
-        virtual char WaitNextChar();
-    };
-}
+  virtual char WaitNextChar();
+};
+} // namespace retro
+#endif

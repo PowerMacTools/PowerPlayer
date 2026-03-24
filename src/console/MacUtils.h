@@ -1,3 +1,5 @@
+#ifdef __RETRO68__
+
 /*
     Copyright 2012 Wolfgang Thaller.
 
@@ -24,22 +26,17 @@
 #include <Quickdraw.h>
 #include <stdlib.h>
 
-namespace retro
-{
-    class PortSetter
-    {
-        GrafPtr save;
+namespace retro {
+class PortSetter {
+  GrafPtr save;
 
-    public:
-        PortSetter(GrafPtr port)
-        {
-            ::GetPort(&save);
-            ::SetPort(port);
-        }
+public:
+  PortSetter(GrafPtr port) {
+    ::GetPort(&save);
+    ::SetPort(port);
+  }
 
-        ~PortSetter()
-        {
-            ::SetPort(save);
-        }
-    };
-}
+  ~PortSetter() { ::SetPort(save); }
+};
+} // namespace retro
+#endif
